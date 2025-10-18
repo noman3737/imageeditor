@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title> Image Editor </title>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+<style>
+body {
+    font-family: 'Roboto', sans-serif;
+    margin:0; padding:0;
+    background: linear-gradient(to right, #030303, #fc2525);
+    color: #fff;
+    text-align: center;
+}
+.container {
+    max-width: 900px;
+    margin: 30px auto;
+    background: #fff;
+    color: #333;
+    padding: 25px;
+    border-radius: 15px;
+    box-shadow: 0 8px 25px rgba(0,0,0,0.3);
+}
+h1 { margin-bottom: 20px; }
+#preview { max-width: 100%; border-radius: 10px; box-shadow: 0 5px 15px rgba(0,0,0,0.2); margin: 20px 0; }
+button {
+    margin: 5px; padding: 8px 15px;
+    border:none; border-radius: 8px;
+    cursor:pointer;
+    background: #01050a;
+    color:#fff;
+    transition: all 0.3s;
+}
+button:hover { background: #06020af3; transform: scale(1.05); }
+input[type=range] { width: 150px; margin: 5px; }
+
+#actions { display: flex; flex-wrap: wrap; justify-content: center; }
+.action-btn { display: flex; flex-direction: column; align-items:center; margin: 8px; }
+.action-btn button { width: 100px; }
+.filters-preview { display:flex; flex-wrap:wrap; justify-content:center; margin-top:10px; }
+.filters-preview img { width: 80px; margin:5px; border-radius:5px; cursor:pointer; transition: transform 0.2s; }
+.filters-preview img:hover { transform: scale(1.1); box-shadow:0 5px 15px rgba(0,0,0,0.3); }
+
+#uploadArea {
+    border: 2px dashed #0e0f0f; padding: 20px; border-radius:10px; cursor:pointer;
+    margin-bottom: 15px;
+}
+#uploadArea.dragover { background: #f0f8ff; border-color: #0e041a96; }
+</style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Image Editor</h1>
+
+    <div id="uploadArea">Click or Drag & Drop Image Here</div>
+    <input type="file" id="fileInput" style="display:none">
+
+    <img id="preview" src="" alt="Preview" style="display:none">
+
+    <div id="actions" style="display:none">
+        <div class="action-btn"><button onclick="edit('grayscale')">Grayscale</button></div>
+        <div class="action-btn"><button onclick="edit('blur')">Blur</button></div>
+        <div class="action-btn"><button onclick="edit('rotate_left')">Rotate L</button></div>
+        <div class="action-btn"><button onclick="edit('rotate_right')">Rotate R</button></div>
+        <div class="action-btn"><button onclick="edit('flip_horizontal')">Flip H</button></div>
+        <div class="action-btn"><button onclick="edit('flip_vertical')">Flip V</button></div>
+        <div class="action-btn"><button onclick="edit('edge_detect')">Edge</button></div>
+        <div class="action-btn"><button onclick="edit('sharpen')">Sharpen</button></div>
+        <div class="action-btn"><button onclick="edit('sepia')">Sepia</button></div>
+        <div class="action-btn"><button onclick="edit('vintage')">Vintage</button></div>
+        <div class="action-btn"><button onclick="edit('cool')">Cool</button></div>
+        <div class="action-btn"><button onclick="edit('warm')">Warm</button></div>
+        <div class="action-btn"><button onclick="edit('negative')">Negative</button></div>
+        <div class="action-btn"><button onclick="edit('emboss')">Emboss</button></div>
+        <div class="action-btn"><button onclick="edit('pencil_sketch')">Pencil</button></div>
+        <div class="action-btn"><button onclick="edit('cartoon')">Cartoon</button></div>
+    </div>
+
+    <div style="margin:20px 0;">
+        <label>Brightness: <input type="range" min="-100" max="100" value="30" id="brightnessSlider" oninput="edit('brightness', this.value)"></label><br>
+        <label>Contrast: <input type="range" min="0.1" max="3" step="0.1" value="1.5" id="contrastSlider" oninput="edit('contrast', this.value)"></label><br>
+        <button onclick="download()">Download</button>
+        <button onclick="resetImage()">Reset</button>
+    </div>
+
+</div>
+
+<script>
+let currentFile = '';
+const fileInput = document.getElementById('fileInput');
+const uploadArea = document.getElementById('uploadArea');
+
+uploadArea.addEventListener('click', ()=> fileInput.click());
+uploadArea.addEventListener('dragover', e=> { e.preventDefault(); uploadArea.classList.add('dragover'); });
+uploadArea.addEventListener('dragleave', e=> { e.preventDefault(); uploadArea.classList.remove('dragover'); });
+uploadArea.addEventListener('drop', e=> {
+    e.preventDefault();
+    uploadArea.classList.remove('dragover');
+    fileInput.files = e.dataTransfer.files;
+    uploadFile();
+});
+
+fileInput.addEventListener('change', uploadFile);
+
+function uploadFile(){
+    let file = fileInput.files[0];
+    if(!file) return;
+
+    let formData = new FormData();
+    formData.append('file', file);
+
+    fetch('/upload', { method: 'POST', body: formData })
+    .then(res => res.json())
+    .then(data => {
+        if(data.success){
+            currentFile = data.filename;
+            document.getElementById('preview').src = '/preview/' + currentFile;
+            document.getElementById('preview').style.display = 'block';
+            document.getElementById('actions').style.display = 'flex';
+        } else {
+            alert(data.error);
+        }
+    });
+}
+
+function edit(action, value=null){
+    fetch('/edit', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({action:action, value:value})
+    })
+    .then(res=>res.json())
+    .then(data=>{
+        if(data.success){
+            currentFile = data.filename;
+            document.getElementById('preview').src = '/preview/' + currentFile + '?t=' + new Date().getTime();
+        } else {
+            alert(data.error);
+        }
+    });
+}
+
+function download(){
+    window.location.href = '/download';
+}
+
+function resetImage(){
+    fetch('/reset')
+    .then(res=>res.json())
+    .then(data=>{
+        if(data.success){
+            currentFile = data.filename;
+            document.getElementById('preview').src = '/preview/' + currentFile + '?t=' + new Date().getTime();
+        } else {
+            alert(data.error);
+        }
+    });
+}
+</script>
+
+</body>
+</html>
